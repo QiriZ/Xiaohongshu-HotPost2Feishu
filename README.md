@@ -1,0 +1,2 @@
+# Xiaohongshu-HotPost2Feishu
+智能识别小红书博主主页的爆款文章的Chrome插件，识别内容可以一键保存至飞书进行后续分析
