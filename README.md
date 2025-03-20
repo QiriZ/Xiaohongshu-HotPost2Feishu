@@ -22,7 +22,7 @@
 ### 安装步骤
 1. 克隆仓库
 ```bash
-git clone https://github.com/yourname/XHS-Feishu-Saver.git
+git clone https://github.com/QiriZ/Xiaohongshu-HotPost2Feishu.git
 ```
 2. Chrome加载扩展
 - 打开Chrome浏览器，进入扩展管理页面（chrome://extensions/）
