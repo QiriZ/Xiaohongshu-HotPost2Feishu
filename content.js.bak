@@ -1,0 +1,345 @@
+// 小红书爆款文章筛选与飞书保存 - 内容脚本
+
+// 页面加载完成后，在控制台记录日志
+window.addEventListener("load", function() {
+  console.log("小红书文章分析器已加载");
+});
+
+// 监听来自扩展后台的消息
+chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+  if (message.action === "analyzeArticles") {
+    var threshold = message.threshold || 1000;
+    
+    // 分析页面上的文章
+    analyzeArticles(threshold)
+      .then(function(result) {
+        sendResponse(result);
+      })
+      .catch(function(error) {
+        console.error("分析文章时出错:", error);
+        sendResponse({ error: error.message });
+      });
+    
+    // 返回true表示将异步发送响应
+    return true;
+  }
+});
+
+// 分析页面上的所有文章
+async function analyzeArticles(likeThreshold) {
+  try {
+    // 发送日志消息
+    sendLog("开始分析小红书文章");
+    
+    // 获取所有文章元素
+    var articles = findArticleElements();
+    
+    if (!articles || articles.length === 0) {
+      sendLog("未找到任何文章元素，请确认当前是否在小红书博主主页", "warning");
+      return { success: false, error: "未找到文章元素" };
+    }
+    
+    sendLog("找到 " + articles.length + " 个潜在的文章元素");
+    
+    // 处理找到的文章元素
+    var processedArticles = [];
+    for (var i = 0; i < articles.length; i++) {
+      try {
+        var article = articles[i];
+        
+        // 提取文章信息
+        var title = extractTitle(article);
+        var link = extractLink(article);
+        var likesText = extractLikes(article);
+        
+        // 解析点赞数
+        var likes = parseLikeCount(likesText);
+        
+        // 只保留有效文章
+        if (title && link && likes !== null) {
+          processedArticles.push({
+            title: title,
+            link: link,
+            likes: likes,
+            likesText: likesText
+          });
+        }
+      } catch (error) {
+        console.error("处理文章元素时出错:", error);
+      }
+    }
+    
+    sendLog("成功处理 " + processedArticles.length + " 篇文章");
+    
+    // 根据点赞数阈值筛选文章
+    var filteredArticles = [];
+    for (var i = 0; i < processedArticles.length; i++) {
+      if (processedArticles[i].likes >= likeThreshold) {
+        filteredArticles.push(processedArticles[i]);
+      }
+    }
+    
+    sendLog("筛选出 " + filteredArticles.length + " 篇点赞数超过 " + likeThreshold + " 的文章");
+    
+    // 将结果发送给扩展的侧边栏界面
+    chrome.runtime.sendMessage({
+      action: "analysisResult",
+      allArticles: processedArticles,
+      filteredArticles: filteredArticles,
+      threshold: likeThreshold
+    });
+    
+    return {
+      success: true,
+      allArticles: processedArticles,
+      filteredArticles: filteredArticles
+    };
+    
+  } catch (error) {
+    sendLog("分析文章时出错: " + error.message, "error");
+    throw error;
+  }
+}
+
+// 在页面上查找所有文章元素
+function findArticleElements() {
+  // 多级选择器策略
+  var selectors = [
+    // 主选择器
+    ".note-item, .feed-item",
+    // 备用选择器1
+    ".content-item, .note-card",
+    // 备用选择器2
+    "article, .post-item, .feed-card",
+    // 通用选择器
+    ".explore-feed a[href*=\"xhslink.com\"], a[href*=\"/explore/\"]"
+  ];
+  
+  // 尝试每一个选择器
+  for (var i = 0; i < selectors.length; i++) {
+    var elements = document.querySelectorAll(selectors[i]);
+    if (elements && elements.length > 0) {
+      sendLog("使用选择器 \"" + selectors[i] + "\" 找到 " + elements.length + " 个文章元素");
+      return Array.from(elements);
+    }
+  }
+  
+  // 如果所有选择器都失败，尝试更通用的方法
+  var likeIcons = document.querySelectorAll(".like, .comment, .collect, [class*=\"like\"], [class*=\"heart\"]");
+  if (likeIcons && likeIcons.length > 0) {
+    // 找到点赞图标的父级容器
+    var articleCandidates = new Set();
+    for (var i = 0; i < likeIcons.length; i++) {
+      var icon = likeIcons[i];
+      // 向上查找最多5层
+      var parent = icon.parentElement;
+      for (var j = 0; j < 5 && parent; j++) {
+        if (parent.tagName === "A" || parent.querySelector("a[href*=\"/explore/\"]")) {
+          articleCandidates.add(parent);
+          break;
+        }
+        parent = parent.parentElement;
+      }
+    }
+    
+    sendLog("使用备用策略找到 " + articleCandidates.size + " 个可能的文章元素");
+    return Array.from(articleCandidates);
+  }
+  
+  // 如果仍然找不到，返回空数组
+  sendLog("未能找到任何文章元素，可能页面结构已更改", "warning");
+  return [];
+}
+
+// 从文章元素中提取标题
+function extractTitle(article) {
+  // 多级选择器策略
+  var selectors = [
+    // 主选择器
+    ".title, .note-title, h1, h2, h3",
+    // 备用选择器
+    "[class*=\"title\"], [class*=\"Title\"]",
+    // 通用选择器
+    ".content p, .desc, .description"
+  ];
+  
+  // 尝试每一个选择器
+  for (var i = 0; i < selectors.length; i++) {
+    var titleElement = article.querySelector(selectors[i]);
+    if (titleElement && titleElement.textContent) {
+      // 清理标题文本
+      var title = titleElement.textContent.trim();
+      if (title.length > 0) {
+        return title;
+      }
+    }
+  }
+  
+  // 从alt属性获取
+  var image = article.querySelector("img");
+  if (image && image.alt && image.alt.length > 5) {
+    return image.alt.trim();
+  }
+  
+  // 从整个元素的文本内容获取
+  var text = article.textContent.trim();
+  if (text && text.length > 0 && text.length < 100) {
+    return text;
+  }
+  
+  // 无法提取标题
+  return null;
+}
+
+// 从文章元素中提取链接
+function extractLink(article) {
+  try {
+    // 如果文章元素本身就是链接
+    if (article.tagName === "A" && article.href) {
+      return cleanUrl(article.href);
+    }
+    
+    // 查找子元素中的链接
+    var links = article.getElementsByTagName("a");
+    for (var i = 0; i < links.length; i++) {
+      var href = links[i].href || "";
+      if (href.indexOf("/explore/") > -1 || href.indexOf("xhslink.com") > -1) {
+        return cleanUrl(href);
+      }
+    }
+    
+    // 查找data属性
+    var dataAttrs = article.attributes;
+    for (var i = 0; i < dataAttrs.length; i++) {
+      var attr = dataAttrs[i];
+      if (attr.name.indexOf("data-") === 0) {
+        var value = attr.value || "";
+        if (value.indexOf("/explore/") > -1) {
+          return cleanUrl(value);
+        }
+      }
+    }
+    
+    // 从HTML内容中提取笔记ID
+    var html = article.outerHTML || "";
+    var noteMatch = /note\/([a-zA-Z0-9]+)/.exec(html);
+    if (noteMatch && noteMatch[1]) {
+      return "https://www.xiaohongshu.com/explore/" + noteMatch[1];
+    }
+    
+    // 无法提取链接
+    return null;
+  } catch (error) {
+    console.error("提取链接时出错:", error);
+    return null;
+  }
+}
+
+// 清理和标准化URL
+function cleanUrl(url) {
+  if (!url) return null;
+  
+  // 处理相对URL
+  if (url.charAt(0) === "/") {
+    return "https://www.xiaohongshu.com" + url;
+  }
+  
+  // 如果不包含域名，尝试提取笔记ID
+  if (url.indexOf("xiaohongshu.com") === -1 && url.indexOf("xhslink.com") === -1) {
+    var noteMatch = /note\/([a-zA-Z0-9]+)/.exec(url);
+    if (noteMatch && noteMatch[1]) {
+      return "https://www.xiaohongshu.com/explore/" + noteMatch[1];
+    }
+  }
+  
+  return url;
+}
+
+// 从文章元素中提取点赞数
+function extractLikes(article) {
+  // 多级选择器策略
+  var selectors = [
+    // 主选择器 - 点赞数通常有特定的类名
+    ".like-count, .likes, .like-num, [class*=\"like\"]",
+    // 备用选择器 - 一些常见的替代类名
+    ".interactions span, .count span, .statistics span"
+  ];
+  
+  // 尝试每一个选择器
+  for (var i = 0; i < selectors.length; i++) {
+    var elements = article.querySelectorAll(selectors[i]);
+    for (var j = 0; j < elements.length; j++) {
+      var element = elements[j];
+      var text = element.textContent.trim();
+      // 验证文本是否包含数字
+      if (/[0-9]/.test(text)) {
+        return text;
+      }
+    }
+  }
+  
+  // 通用方法：查找包含数字和"赞"字的文本节点
+  var walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
+  var node;
+  while (node = walker.nextNode()) {
+    var text = node.textContent.trim();
+    if (text && 
+        (text.indexOf("赞") >= 0 || text.indexOf("like") >= 0 || text.indexOf("❤") >= 0) && 
+        /[0-9]/.test(text)) {
+      return text;
+    }
+  }
+  
+  // 无法提取点赞数
+  return null;
+}
+
+// 解析点赞数文本
+function parseLikeCount(likesText) {
+  if (!likesText) {
+    return null;
+  }
+  
+  // 去除所有非数字和非小数点的字符
+  var cleanText = "";
+  for (var i = 0; i < likesText.length; i++) {
+    var char = likesText.charAt(i);
+    if ((char >= "0" && char <= "9") || char === ".") {
+      cleanText += char;
+    }
+  }
+  
+  // 如果文本为空，无法解析
+  if (!cleanText) {
+    return null;
+  }
+  
+  // 解析为数字
+  var count = parseFloat(cleanText);
+  
+  // 处理带单位的情况
+  if (likesText.indexOf("万") >= 0 || likesText.indexOf("w") >= 0 || likesText.indexOf("W") >= 0) {
+    count *= 10000;
+  } else if (likesText.indexOf("k") >= 0 || likesText.indexOf("K") >= 0) {
+    count *= 1000;
+  }
+  
+  // 返回整数形式的点赞数
+  return Math.round(count);
+}
+
+// 发送日志消息到扩展的后台服务
+function sendLog(message, level) {
+  if (!level) {
+    level = "info";
+  }
+  
+  chrome.runtime.sendMessage({
+    action: "log",
+    message: message,
+    level: level
+  });
+  
+  // 同时在控制台输出日志
+  console.log("[" + level.toUpperCase() + "] " + message);
+}

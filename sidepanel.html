@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小红书爆款文章筛选</title>
+  <style>
+    /* 基础样式 */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      background-color: #f8f8f8;
+      padding: 16px;
+      width: 100%;
+      min-height: 100vh;
+    }
+    
+    /* 标题和描述 */
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .header h1 {
+      font-size: 18px;
+      color: #ff2442; /* 小红书红色 */
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      font-size: 12px;
+      color: #999;
+    }
+    
+    /* 主要内容区域 */
+    .container {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    
+    /* 控制面板 */
+    .control-panel {
+      padding: 16px;
+      background-color: #fff;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .input-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .input-group label {
+      flex: 0 0 70px;
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .input-group input {
+      flex: 1;
+      height: 36px;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      padding: 0 12px;
+      font-size: 14px;
+    }
+    
+    .input-group input:focus {
+      outline: none;
+      border-color: #ff2442;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+    
+    button {
+      height: 36px;
+      padding: 0 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    button:hover {
+      opacity: 0.9;
+    }
+    
+    .btn-primary {
+      background-color: #ff2442;
+      color: #fff;
+    }
+    
+    .btn-secondary {
+      background-color: #f5f5f5;
+      color: #666;
+      border: 1px solid #e5e5e5;
+    }
+    
+    /* 结果列表 */
+    .result-container {
+      padding: 16px;
+    }
+    
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .result-header h2 {
+      font-size: 16px;
+      color: #333;
+    }
+    
+    .result-stats {
+      font-size: 12px;
+      color: #999;
+    }
+    
+    .article-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+    
+    .article-item {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .article-item:last-child {
+      border-bottom: none;
+    }
+    
+    .article-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #333;
+    }
+    
+    .article-meta {
+      display: flex;
+      font-size: 12px;
+      color: #999;
+    }
+    
+    .article-meta span {
+      margin-right: 12px;
+    }
+    
+    .article-link {
+      color: #1890ff;
+    }
+    
+    .article-likes {
+      color: #ff2442;
+    }
+    
+    .no-result {
+      padding: 20px;
+      text-align: center;
+      color: #999;
+    }
+    
+    /* 加载状态 */
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #999;
+    }
+    
+    .loading span {
+      display: inline-block;
+      animation: loading 1.4s infinite both;
+    }
+    
+    .loading span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    
+    .loading span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    
+    @keyframes loading {
+      0% { opacity: 0.2; }
+      50% { opacity: 1; }
+      100% { opacity: 0.2; }
+    }
+    
+    /* 选项卡 */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .tab-item {
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #666;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    
+    .tab-item.active {
+      color: #ff2442;
+      border-bottom-color: #ff2442;
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 16px;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* 设置面板 */
+    .settings-group {
+      margin-bottom: 16px;
+    }
+    
+    .settings-group h3 {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    
+    /* 日志面板 */
+    .logs-container {
+      margin-top: 16px;
+      border-top: 1px solid #eee;
+      padding-top: 16px;
+    }
+    
+    .logs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .logs-title {
+      font-size: 14px;
+      color: #333;
+    }
+    
+    .logs-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .logs-actions button {
+      height: 28px;
+      padding: 0 8px;
+      font-size: 12px;
+    }
+    
+    .logs-list {
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 12px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      padding: 8px;
+    }
+    
+    .log-item {
+      margin-bottom: 4px;
+      padding-bottom: 4px;
+      border-bottom: 1px dashed #eee;
+    }
+    
+    .log-item:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    
+    .log-timestamp {
+      color: #999;
+      margin-right: 6px;
+    }
+    
+    .log-message {
+      color: #666;
+    }
+    
+    .log-level-info {
+      color: #1890ff;
+    }
+    
+    .log-level-warning {
+      color: #faad14;
+    }
+    
+    .log-level-error {
+      color: #f5222d;
+    }
+    
+    /* 响应式设计 */
+    @media (max-width: 480px) {
+      .button-group {
+        flex-direction: column;
+      }
+      
+      .input-group {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .input-group label {
+        margin-bottom: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>小红书爆款文章筛选</h1>
+    <p>筛选高点赞文章，一键保存到飞书多维表格</p>
+  </div>
+  
+  <div class="container">
+    <!-- 选项卡 -->
+    <div class="tabs">
+      <div class="tab-item active" data-tab="filter">筛选文章</div>
+      <div class="tab-item" data-tab="settings">飞书设置</div>
+    </div>
+    
+    <!-- 筛选文章面板 -->
+    <div class="tab-content active" id="filter-tab">
+      <div class="control-panel">
+        <div class="input-group">
+          <label for="threshold">点赞阈值:</label>
+          <input type="number" id="threshold" value="1000" min="0" placeholder="输入点赞数阈值">
+        </div>
+        <div class="button-group">
+          <button class="btn-primary" id="analyze-btn">筛选文章</button>
+          <button class="btn-secondary" id="save-btn" disabled>保存到飞书</button>
+        </div>
+      </div>
+      
+      <div class="result-container">
+        <div class="result-header">
+          <h2>筛选结果</h2>
+          <div class="result-stats">找到 <span id="result-count">0</span> 篇文章</div>
+        </div>
+        
+        <div class="article-list" id="article-list">
+          <div class="no-result">尚未进行筛选，请点击"筛选文章"按钮</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 飞书设置面板 -->
+    <div class="tab-content" id="settings-tab">
+      <div class="settings-group">
+        <h3>飞书API配置</h3>
+        <div class="input-group">
+          <label for="app-id">APP ID:</label>
+          <input type="text" id="app-id" placeholder="输入飞书APP ID">
+        </div>
+        <div class="input-group">
+          <label for="app-secret">App Secret:</label>
+          <input type="text" id="app-secret" placeholder="输入飞书App Secret">
+        </div>
+        <div class="input-group">
+          <label for="base-id">Base ID:</label>
+          <input type="text" id="base-id" placeholder="输入飞书多维表格Base ID">
+        </div>
+        <div class="input-group">
+          <label for="table-id">Table ID:</label>
+          <input type="text" id="table-id" placeholder="输入飞书多维表格Table ID">
+        </div>
+        <div class="button-group">
+          <button class="btn-primary" id="save-config-btn">保存配置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 日志面板 -->
+  <div class="logs-container">
+    <div class="logs-header">
+      <div class="logs-title">操作日志</div>
+      <div class="logs-actions">
+        <button class="btn-secondary" id="toggle-logs-btn">展开/折叠</button>
+        <button class="btn-secondary" id="clear-logs-btn">清除日志</button>
+      </div>
+    </div>
+    <div class="logs-list" id="logs-list" style="display: none;"></div>
+  </div>
+  
+  <script src="sidepanel.js"></script>
+</body>
+</html>

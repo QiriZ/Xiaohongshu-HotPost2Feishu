@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "小红书爆款文章筛选与飞书保存",
+  "version": "1.0",
+  "description": "在小红书博主主页筛选高点赞文章，一键保存到飞书多维表格",
+  "icons": {
+    "16": "images/icon16.png",
+    "32": "images/icon32.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "scripting",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://*.xiaohongshu.com/*",
+    "https://open.feishu.cn/*"
+  ],
+  "action": {
+    "default_title": "小红书文章筛选"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.xiaohongshu.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
