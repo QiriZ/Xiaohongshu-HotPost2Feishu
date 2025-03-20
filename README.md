@@ -1,4 +1,3 @@
-# 小红书爆款文章筛选与飞书保存 Chrome扩展
 # 小红书爆款文章筛选与飞书保存 Chrome扩展 
 
 [![版本](https://img.shields.io/badge/版本-1.0.0-orange)](https://github.com/yourname/XHS-Feishu-Saver/releases)
@@ -6,7 +5,7 @@
 [![飞书API](https://img.shields.io/badge/飞书API-v3-blue)](https://open.feishu.cn/)
 
 <p align="center">
-  <img src="界面截图.png" alt="插件界面截图" width="80%">
+  <img src="界面截图.png" alt="插件界面截图" width="20%">
   <br>插件操作界面预览
 </p>
 
